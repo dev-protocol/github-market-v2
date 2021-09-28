@@ -1,37 +1,44 @@
-/* eslint-disable @typescript-eslint/prefer-readonly-parameter-types */
-import { ethers, providers, ContractFactory } from 'ethers'
-import { config, DotenvParseOutput } from 'dotenv'
-import { Class } from 'type-fest'
-import Provider = providers.Provider
+/* eslint-disable spaced-comment */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+import { ethers } from 'hardhat'
 
-export type ContractDeployer = (
-	_wallet: ethers.Wallet,
-	_factory: Class<ContractFactory>,
-	_envs: DotenvParseOutput
-) => Promise<void>
+async function main() {
+	//!please check!!!!!!!!!
+	const registryAddress = ''
+	//!!!!!!!!!!!!!!!!!!!!!!
 
-const getDeployer = (
-	deployMnemonic?: string,
-	deployNodeUrl = 'http://127.0.0.1:8545'
-): ethers.Wallet => {
-	if (!deployMnemonic) {
-		throw new Error(
-			`Error: No DEPLOY_MNEMONIC env var set. Please add it to .<environment>.env file it and try again. See .env.example for more info.\n`
-		)
-	}
+	// GitHubMarket
+	const gitHubMarketFactory = await ethers.getContractFactory('GitHubMarket')
+	const gitHubMarket = await gitHubMarketFactory.deploy()
+	await gitHubMarket.deployed()
 
-	// Connect provider
-	const provider: Provider = new ethers.providers.JsonRpcProvider(deployNodeUrl)
+	// MarketAdmin
+	const marketAdminFactory = await ethers.getContractFactory('MarketAdmin')
+	const marketAdmin = await marketAdminFactory.deploy()
+	await marketAdmin.deployed()
 
-	return ethers.Wallet.fromMnemonic(deployMnemonic).connect(provider)
+	const data = ethers.utils.arrayify('0x')
+
+	// MarketProxy
+	const marketProxyFactory = await ethers.getContractFactory('MarketProxy')
+	const marketProxy = await marketProxyFactory.deploy(
+		gitHubMarket.address,
+		marketAdmin.address,
+		data
+	)
+	await marketProxy.deployed()
+
+	const proxy = gitHubMarketFactory.attach(marketProxy.address)
+	await proxy.initialize(registryAddress)
+
+	console.log('github market deployed to:', gitHubMarket.address)
+	console.log('market admin deployed to:', marketAdmin.address)
+	console.log('market proxy deployed to:', marketProxy.address)
 }
 
-export const deploy = async (deployer: ContractDeployer): Promise<void> => {
-	const envs = config().parsed ?? {}
-	const mnemonic = envs.DEPLOY_MNEMONIC
-	const node = envs.DEPLOY_NODE_URL
-	const wallet = getDeployer(mnemonic, node)
-
-	console.log(`Deploying to network [${node ?? 'local'}]`)
-	await deployer(wallet, ContractFactory, envs)
-}
+main()
+	.then(() => process.exit(0))
+	.catch((error) => {
+		console.error(error)
+		process.exit(1)
+	})
