@@ -190,8 +190,8 @@ contract GitHubMarket is
 	}
 
 	function schema() external pure override returns (string memory) {
-		// solhint-disable-next-line quotes
 		return
+			// solhint-disable-next-line quotes
 			'["GitHub Repository (e.g, your/awesome-repos)", "Khaos Public Signature"]';
 	}
 

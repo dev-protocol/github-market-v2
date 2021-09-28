@@ -1,28 +1,22 @@
 /* eslint-disable new-cap */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable no-await-in-loop */
 import { expect, use } from 'chai'
-import { Contract } from 'ethers'
-import { ethers } from 'hardhat'
+import { constants } from 'ethers'
+import { ethers, waffle } from 'hardhat'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { solidity } from 'ethereum-waffle'
+import GitHubMarketArtifact from '../artifacts/contracts/GitHubMarket.sol/GitHubMarket.json'
+import MarketAdminArtifact from '../artifacts/contracts/MarketAdmin.sol/MarketAdmin.json'
+import MarketProxyArtifact from '../artifacts/contracts/MarketProxy.sol/MarketProxy.json'
+import MockAddressRegistryArtifact from '../artifacts/contracts/test/MockAddressRegistry.sol/MockAddressRegistry.json'
+import { GitHubMarket } from '../src/types/GitHubMarket'
+import { MarketAdmin } from '../src/types/MarketAdmin'
+import { MarketProxy } from '../src/types/MarketProxy'
+import { MockAddressRegistry } from '../src/types/MockAddressRegistry'
 
 use(solidity)
 
-const deploy = async (name: string): Promise<Contract> => {
-	const factoryStrage = await ethers.getContractFactory(name)
-	const contract = await factoryStrage.deploy()
-	await contract.deployed()
-	return contract
-}
-
-const deployProxy = async (logic: string, admin: string): Promise<Contract> => {
-	const factoryStrage = await ethers.getContractFactory('MarketProxy')
-	const data = ethers.utils.arrayify('0x')
-	const contract = await factoryStrage.deploy(logic, admin, data)
-	await contract.deployed()
-	return contract
-}
+const { deployContract, provider } = waffle
 
 type signers = {
 	deployer: SignerWithAddress
@@ -33,7 +27,7 @@ type signers = {
 	associatedMarket: SignerWithAddress
 }
 
-const getSigner = async (): Promise<signers> => {
+const getSigners = async (): Promise<signers> => {
 	const [deployer, operator, khaos, user, marketFactory, associatedMarket] =
 		await ethers.getSigners()
 	return {
@@ -47,14 +41,43 @@ const getSigner = async (): Promise<signers> => {
 }
 
 describe('GitHubMarket', () => {
-	const init = async (): Promise<[Contract, Contract, Contract, Contract]> => {
-		const marketBehavior = await deploy('GitHubMarket')
-		const admin = await deploy('MarketAdmin')
-		const proxy = await deployProxy(marketBehavior.address, admin.address)
-		const gitHubMarketFactory = await ethers.getContractFactory('GitHubMarket')
-		const proxyMarket = gitHubMarketFactory.attach(proxy.address)
-		const signers = await getSigner()
-		const reg = await deploy('MockAddressRegistry')
+	const init = async (): Promise<
+		[
+			GitHubMarket,
+			GitHubMarket,
+			GitHubMarket,
+			GitHubMarket,
+			GitHubMarket,
+			GitHubMarket
+		]
+	> => {
+		const signers = await getSigners()
+		const marketBehavior = (await deployContract(
+			signers.deployer,
+			GitHubMarketArtifact
+		)) as GitHubMarket
+		const admin = (await deployContract(
+			signers.deployer,
+			MarketAdminArtifact
+		)) as MarketAdmin
+		const data = ethers.utils.arrayify('0x')
+		const proxy = (await deployContract(signers.deployer, MarketProxyArtifact, [
+			marketBehavior.address,
+			admin.address,
+			data,
+		])) as MarketProxy
+		const gitHubMarketFactory = await ethers.getContractFactory(
+			GitHubMarketArtifact.abi,
+			GitHubMarketArtifact.bytecode,
+			signers.deployer
+		)
+		const proxyMarket = gitHubMarketFactory.attach(
+			proxy.address
+		) as GitHubMarket
+		const reg = (await deployContract(
+			signers.deployer,
+			MockAddressRegistryArtifact
+		)) as MockAddressRegistry
 		await reg.setRegistry('MarketFactory', signers.marketFactory.address)
 		await proxyMarket.initialize(reg.address)
 		await proxyMarket.addOperatorRole(signers.operator.address)
@@ -64,8 +87,30 @@ describe('GitHubMarket', () => {
 			proxyMarket.connect(signers.operator),
 			proxyMarket.connect(signers.khaos),
 			proxyMarket.connect(signers.user),
+			proxyMarket.connect(signers.associatedMarket),
+			proxyMarket.connect(signers.marketFactory),
 		]
 	}
+
+	describe('initialize', () => {
+		describe('success', () => {
+			it('set initial value.', async () => {
+				const [githubMarket] = await init()
+				expect(await githubMarket.registry()).to.not.equal(
+					constants.AddressZero
+				)
+				expect(await githubMarket.priorApproval()).to.equal(true)
+			})
+		})
+		describe('fail', () => {
+			it('Cannot be executed multiple times..', async () => {
+				const [githubMarket] = await init()
+				await expect(
+					githubMarket.initialize(constants.AddressZero)
+				).to.be.revertedWith('Initializable: contract is already initialized')
+			})
+		})
+	})
 
 	describe('name', () => {
 		it("Returns this market's name.", async () => {
@@ -154,7 +199,7 @@ describe('GitHubMarket', () => {
 		describe('success', () => {
 			it('add khaos role.', async () => {
 				const [marketBehavior] = await init()
-				const signers = await getSigner()
+				const signers = await getSigners()
 				const role = await marketBehavior.KHAOS_ROLE()
 				expect(
 					await marketBehavior.hasRole(role, signers.user.address)
@@ -166,7 +211,7 @@ describe('GitHubMarket', () => {
 			})
 			it('delete khaos role.', async () => {
 				const [marketBehavior] = await init()
-				const signers = await getSigner()
+				const signers = await getSigners()
 				const role = await marketBehavior.KHAOS_ROLE()
 				expect(
 					await marketBehavior.hasRole(role, signers.khaos.address)
@@ -180,14 +225,14 @@ describe('GitHubMarket', () => {
 		describe('fail', () => {
 			it('non Admin can not add khaos role.', async () => {
 				const [, marketOperator, marketKhaos, marketuser] = await init()
-				const signers = await getSigner()
+				const signers = await getSigners()
 				for (const market of [marketOperator, marketKhaos, marketuser]) {
 					await expect(market.addKhaosRole(signers.user.address)).to.be.reverted
 				}
 			})
 			it('non Admin can not delete khaos role.', async () => {
 				const [, marketOperator, marketKhaos, marketuser] = await init()
-				const signers = await getSigner()
+				const signers = await getSigners()
 				for (const market of [marketOperator, marketKhaos, marketuser]) {
 					await expect(market.deleteKhaosRole(signers.khaos.address)).to.be
 						.reverted
@@ -199,7 +244,7 @@ describe('GitHubMarket', () => {
 		describe('success', () => {
 			it('add operator role.', async () => {
 				const [marketBehavior] = await init()
-				const signers = await getSigner()
+				const signers = await getSigners()
 				const role = await marketBehavior.OPERATOR_ROLE()
 				expect(
 					await marketBehavior.hasRole(role, signers.user.address)
@@ -211,7 +256,7 @@ describe('GitHubMarket', () => {
 			})
 			it('delete operator role.', async () => {
 				const [marketBehavior] = await init()
-				const signers = await getSigner()
+				const signers = await getSigners()
 				const role = await marketBehavior.OPERATOR_ROLE()
 				expect(
 					await marketBehavior.hasRole(role, signers.operator.address)
@@ -225,7 +270,7 @@ describe('GitHubMarket', () => {
 		describe('fail', () => {
 			it('non Admin can not add operator role.', async () => {
 				const [, marketOperator, marketKhaos, marketuser] = await init()
-				const signers = await getSigner()
+				const signers = await getSigners()
 				for (const market of [marketOperator, marketKhaos, marketuser]) {
 					await expect(market.addOperatorRole(signers.user.address)).to.be
 						.reverted
@@ -233,7 +278,7 @@ describe('GitHubMarket', () => {
 			})
 			it('non Admin can not delete operator role.', async () => {
 				const [, marketOperator, marketKhaos, marketuser] = await init()
-				const signers = await getSigner()
+				const signers = await getSigners()
 				for (const market of [marketOperator, marketKhaos, marketuser]) {
 					await expect(market.deleteOperatorRole(signers.operator.address)).to
 						.be.reverted
@@ -245,7 +290,7 @@ describe('GitHubMarket', () => {
 		describe('success', () => {
 			it('set associated market.', async () => {
 				const [marketBehavior] = await init()
-				const signers = await getSigner()
+				const signers = await getSigners()
 				const marketBehaviorMarketFactory = marketBehavior.connect(
 					signers.marketFactory
 				)
@@ -260,7 +305,7 @@ describe('GitHubMarket', () => {
 		describe('fail', () => {
 			it('non Admin can not set associated market.', async () => {
 				const markets = await init()
-				const signers = await getSigner()
+				const signers = await getSigners()
 				for (const market of markets) {
 					await expect(
 						market.setAssociatedMarket(signers.associatedMarket.address)
@@ -407,134 +452,156 @@ describe('GitHubMarket', () => {
 	//   });
 	// });
 
-	// describe("authenticate", () => {
-	// 	const init2 = async (): Promise<[Contract, Contract]> => {
-	// 		const [marketBehavior] = await init()
-	// 		marketBehavior.connect()
+	describe('authenticate', () => {
+		const init2 = async (): Promise<
+			[
+				GitHubMarket,
+				GitHubMarket,
+				GitHubMarket,
+				GitHubMarket,
+				GitHubMarket,
+				GitHubMarket
+			]
+		> => {
+			const markets = await init()
+			const signers = await getSigners()
+			await markets[5].setAssociatedMarket(signers.associatedMarket.address)
+			return markets
+		}
 
-	// 		const admin = await deploy('MarketAdmin')
-	// 		const proxy = await deployProxy(marketBehavior.address, admin.address)
-	// 		const gitHubMarketFactory = await ethers.getContractFactory(
-	// 			'GitHubMarket'
-	// 		)
-	// 		const proxyMarket = gitHubMarketFactory.attach(proxy.address)
-	// 		const [, operator, khaos, user, marketFactory] = await ethers.getSigners()
-	// 		const reg = await deploy('MockAddressRegistry')
-	// 		await reg.setRegistry('MarketFactory', marketFactory.address)
-	// 		await proxyMarket.initialize(reg.address)
-	// 		await proxyMarket.addOperatorRole(operator.address)
-	// 		await proxyMarket.addKhaosRole(khaos.address)
-	// 		return [proxyMarket, proxyMarket.connect(operator), proxyMarket.connect(khaos), proxyMarket.connect(user)]
-	// 	}
+		describe('success', () => {
+			describe('prior approved mode', () => {
+				it('Query event data is created.', async () => {
+					const [marketBehaviorAdmin, , , , marketByAssociate] = await init2()
+					await marketBehaviorAdmin.setPriorApprovalMode(true)
+					await marketBehaviorAdmin.addPublicSignaturee('dummy-signature')
+					const property = provider.createEmptyWallet()
+					const signers = await getSigners()
+					await expect(
+						marketByAssociate.authenticate(
+							property.address,
+							['user/repository', 'dummy-signature'],
+							signers.user.address
+						)
+					)
+						.to.emit(marketByAssociate, 'Query')
+						.withArgs(
+							'user/repository',
+							'dummy-signature',
+							signers.user.address
+						)
+				})
+			})
 
-	//   describe("success", () => {
-	//     describe("prior approved mode", () => {
-	//       it("Query event data is created.", async () => {
-	//         await marketBehavior.setPriorApprovalMode(true);
-	//         await marketBehavior.setAssociatedMarket(wallet.address);
-	//         await marketBehavior.addPublicSignaturee("dummy-signature");
-	//         await expect(
-	//           marketBehavior.authenticate(
-	//             property1.address,
-	//             "user/repository",
-	//             "dummy-signature",
-	//             "",
-	//             "",
-	//             "",
-	//             market.address,
-	//             wallet.address
-	//           )
-	//         )
-	//           .to.emit(marketBehavior, "Query")
-	//           .withArgs("user/repository", "dummy-signature", wallet.address);
-	//       });
-	//       it("You can also authenticate with a public key set by the operator.", async () => {
-	//         await marketBehavior.setPriorApprovalMode(true);
-	//         await marketBehavior.setAssociatedMarket(wallet.address);
-	//         await marketBehavior.setOperator(operator.address);
-	//         const marketBehaviorOperator = marketBehavior.connect(operator);
-	//         await marketBehaviorOperator.addPublicSignaturee(
-	//           "dummy-signature-second",
-	//           {
-	//             gasLimit: 1000000,
-	//           }
-	//         );
-	//         await expect(
-	//           marketBehavior.authenticate(
-	//             property1.address,
-	//             "user/repository",
-	//             "dummy-signature-second",
-	//             "",
-	//             "",
-	//             "",
-	//             market.address,
-	//             wallet.address
-	//           )
-	//         )
-	//           .to.emit(marketBehavior, "Query")
-	//           .withArgs(
-	//             "user/repository",
-	//             "dummy-signature-second",
-	//             wallet.address
-	//           );
-	//       });
-	//     });
-	//     describe("not prior approved mode", () => {
-	//       it("Query event data is created.", async () => {
-	//         await marketBehavior.setPriorApprovalMode(false);
-	//         await marketBehavior.setAssociatedMarket(wallet.address);
-	//         await expect(
-	//           marketBehavior.authenticate(
-	//             property1.address,
-	//             "user/repository",
-	//             "dummy-signature",
-	//             "",
-	//             "",
-	//             "",
-	//             market.address,
-	//             wallet.address
-	//           )
-	//         )
-	//           .to.emit(marketBehavior, "Query")
-	//           .withArgs("user/repository", "dummy-signature", wallet.address);
-	//       });
-	//     });
-	//   });
-	//   describe("fail", () => {
-	//     it("Not prior approved when in prior approval mode.", async () => {
-	//       await marketBehavior.setPriorApprovalMode(true);
-	//       await marketBehavior.setAssociatedMarket(wallet.address);
-	//       await expect(
-	//         marketBehavior.authenticate(
-	//           property1.address,
-	//           "user/repository",
-	//           "dummy-signature",
-	//           "",
-	//           "",
-	//           "",
-	//           market.address,
-	//           ethers.constants.AddressZero
-	//         )
-	//       ).to.be.revertedWith("it has not been approved");
-	//     });
-	//     it("Sender is not Associated-Market.", async () => {
-	//       await marketBehavior.setPriorApprovalMode(true);
-	//       await marketBehavior.setAssociatedMarket(khaos.address);
-	//       await expect(
-	//         marketBehavior.authenticate(
-	//           property1.address,
-	//           "user/repository",
-	//           "dummy-signature",
-	//           "",
-	//           "",
-	//           "",
-	//           market.address,
-	//           ethers.constants.AddressZero
-	//         )
-	//       ).to.be.revertedWith("Invalid sender");
-	//     });
-	//   });
-	// });
+			// Describe("prior approved mode", () => {
+			//   it("Query event data is created.", async () => {
+			// 		const
+			//     await marketBehavior.setPriorApprovalMode(true);
+			//     await marketBehavior.setAssociatedMarket(wallet.address);
+			//     await marketBehavior.addPublicSignaturee("dummy-signature");
+			//     await expect(
+			//       marketBehavior.authenticate(
+			//         property1.address,
+			//         "user/repository",
+			//         "dummy-signature",
+			//         "",
+			//         "",
+			//         "",
+			//         market.address,
+			//         wallet.address
+			//       )
+			//     )
+			//       .to.emit(marketBehavior, "Query")
+			//       .withArgs("user/repository", "dummy-signature", wallet.address);
+			//   });
+			//   it("You can also authenticate with a public key set by the operator.", async () => {
+			//     await marketBehavior.setPriorApprovalMode(true);
+			//     await marketBehavior.setAssociatedMarket(wallet.address);
+			//     await marketBehavior.setOperator(operator.address);
+			//     const marketBehaviorOperator = marketBehavior.connect(operator);
+			//     await marketBehaviorOperator.addPublicSignaturee(
+			//       "dummy-signature-second",
+			//       {
+			//         gasLimit: 1000000,
+			//       }
+			//     );
+			//     await expect(
+			//       marketBehavior.authenticate(
+			//         property1.address,
+			//         "user/repository",
+			//         "dummy-signature-second",
+			//         "",
+			//         "",
+			//         "",
+			//         market.address,
+			//         wallet.address
+			//       )
+			//     )
+			//       .to.emit(marketBehavior, "Query")
+			//       .withArgs(
+			//         "user/repository",
+			//         "dummy-signature-second",
+			//         wallet.address
+			//       );
+			//   });
+			// });
+			// describe("not prior approved mode", () => {
+			//   it("Query event data is created.", async () => {
+			//     await marketBehavior.setPriorApprovalMode(false);
+			//     await marketBehavior.setAssociatedMarket(wallet.address);
+			//     await expect(
+			//       marketBehavior.authenticate(
+			//         property1.address,
+			//         "user/repository",
+			//         "dummy-signature",
+			//         "",
+			//         "",
+			//         "",
+			//         market.address,
+			//         wallet.address
+			//       )
+			//     )
+			//       .to.emit(marketBehavior, "Query")
+			//       .withArgs("user/repository", "dummy-signature", wallet.address);
+			//   });
+			// });
+		})
+		// Describe("fail", () => {
+		//   it("Not prior approved when in prior approval mode.", async () => {
+		//     await marketBehavior.setPriorApprovalMode(true);
+		//     await marketBehavior.setAssociatedMarket(wallet.address);
+		//     await expect(
+		//       marketBehavior.authenticate(
+		//         property1.address,
+		//         "user/repository",
+		//         "dummy-signature",
+		//         "",
+		//         "",
+		//         "",
+		//         market.address,
+		//         ethers.constants.AddressZero
+		//       )
+		//     ).to.be.revertedWith("it has not been approved");
+		//   });
+		//   it("Sender is not Associated-Market.", async () => {
+		//     await marketBehavior.setPriorApprovalMode(true);
+		//     await marketBehavior.setAssociatedMarket(khaos.address);
+		//     await expect(
+		//       marketBehavior.authenticate(
+		//         property1.address,
+		//         "user/repository",
+		//         "dummy-signature",
+		//         "",
+		//         "",
+		//         "",
+		//         market.address,
+		//         ethers.constants.AddressZero
+		//       )
+		//     ).to.be.revertedWith("Invalid sender");
+		//   });
+		// });
+	})
+
 	// Describe("khaosCallback", () => {
 	//   describe("success", () => {
 	//     it("The authentication is completed when the callback function is executed from khaos.", async () => {
