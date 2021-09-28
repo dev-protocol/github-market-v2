@@ -12,16 +12,12 @@ contract GitHubMarket is
 	PausableUpgradeable,
 	AccessControlUpgradeable
 {
-	address private khaos;
-	address private operator;
-	address public override associatedMarket;
 	address public registry;
-	bool public priorApproval;
+	address public override associatedMarket;
 	mapping(address => string) private repositories;
 	mapping(bytes32 => address) private metrics;
 	mapping(bytes32 => address) private properties;
 	mapping(bytes32 => bool) private pendingAuthentication;
-	mapping(string => bool) private publicSignatures;
 
 	// ROLE
 	bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
@@ -45,7 +41,6 @@ contract GitHubMarket is
 		_setupRole(OPERATOR_ROLE, _msgSender());
 		_setRoleAdmin(KHAOS_ROLE, DEFAULT_ADMIN_ROLE);
 		_setupRole(KHAOS_ROLE, _msgSender());
-		priorApproval = true;
 	}
 
 	/*
@@ -59,16 +54,10 @@ contract GitHubMarket is
 		string[] memory _args,
 		address account
 	) external override whenNotPaused returns (bool) {
+		require(msg.sender == associatedMarket, "invalid sender");
+		require(_args.length == 2, "args error");
 		string memory githubRepository = _args[0];
 		string memory publicSignature = _args[1];
-		require(msg.sender == associatedMarket, "Invalid sender");
-
-		if (priorApproval) {
-			require(
-				publicSignatures[publicSignature],
-				"it has not been approved"
-			);
-		}
 		bytes32 key = createKey(githubRepository);
 		emit Query(githubRepository, publicSignature, account);
 		properties[key] = _prop;
@@ -131,22 +120,6 @@ contract GitHubMarket is
 		returns (address)
 	{
 		return metrics[createKey(_repository)];
-	}
-
-	function setPriorApprovalMode(bool _value)
-		external
-		onlyRole(DEFAULT_ADMIN_ROLE)
-	{
-		priorApproval = _value;
-	}
-
-	function addPublicSignaturee(string memory _publicSignature) external {
-		require(
-			hasRole(DEFAULT_ADMIN_ROLE, msg.sender) ||
-				hasRole(OPERATOR_ROLE, msg.sender),
-			"illegal access"
-		);
-		publicSignatures[_publicSignature] = true;
 	}
 
 	function addOperatorRole(address _operator)
