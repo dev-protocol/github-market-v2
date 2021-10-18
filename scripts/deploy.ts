@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
 import { ethers } from 'hardhat'
 
+
 async function main() {
 	//!please check!!!!!!!!!
 	const registryAddress = ''
@@ -37,3 +38,9 @@ main()
 		console.error(error)
 		process.exit(1)
 	})
+
+
+	// memo
+	// set registryAddress and adminAddress and update hardhat.config infuraKey andmnemonic
+	// and execute this command
+	// npx hardhat run --network arbitrumRinkeby scripts/deploy.ts
