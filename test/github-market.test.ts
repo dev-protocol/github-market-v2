@@ -1,7 +1,6 @@
+/* eslint-disable @typescript-eslint/prefer-readonly-parameter-types */
 /* eslint-disable new-cap */
 /* eslint-disable no-await-in-loop */
-/* eslint-disable @typescript-eslint/prefer-readonly-parameter-types */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 
 import { expect, use } from 'chai'
 import { constants } from 'ethers'
@@ -19,7 +18,7 @@ use(solidity)
 
 const { deployContract, deployMockContract, provider } = waffle
 
-type signers = {
+type Signers = {
 	deployer: SignerWithAddress
 	operator: SignerWithAddress
 	khaos: SignerWithAddress
@@ -28,7 +27,7 @@ type signers = {
 	associatedMarket: SignerWithAddress
 }
 
-type markets = {
+type Markets = {
 	deployer: GitHubMarket
 	operator: GitHubMarket
 	khaos: GitHubMarket
@@ -37,7 +36,7 @@ type markets = {
 	associatedMarket: GitHubMarket
 }
 
-const getSigners = async (): Promise<signers> => {
+const getSigners = async (): Promise<Signers> => {
 	const [deployer, operator, khaos, user, marketFactory, associatedMarket] =
 		await ethers.getSigners()
 	return {
@@ -50,7 +49,7 @@ const getSigners = async (): Promise<signers> => {
 	}
 }
 
-const getMarketsWithoutAdmin = (markets: markets): GitHubMarket[] => [
+const getMarketsWithoutAdmin = (markets: Markets): GitHubMarket[] => [
 	markets.operator,
 	markets.khaos,
 	markets.user,
@@ -58,7 +57,7 @@ const getMarketsWithoutAdmin = (markets: markets): GitHubMarket[] => [
 	markets.associatedMarket,
 ]
 
-const init = async (): Promise<markets> => {
+const init = async (): Promise<Markets> => {
 	const signers = await getSigners()
 	const marketBehavior = (await deployContract(
 		signers.deployer,
@@ -118,7 +117,7 @@ const init = async (): Promise<markets> => {
 	}
 }
 
-const init2 = async (): Promise<markets> => {
+const init2 = async (): Promise<Markets> => {
 	const markets = await init()
 	const signers = await getSigners()
 	await markets.marketFactory.setAssociatedMarket(
@@ -127,7 +126,7 @@ const init2 = async (): Promise<markets> => {
 	return markets
 }
 
-const init3 = async (): Promise<[markets, string, string]> => {
+const init3 = async (): Promise<[Markets, string, string]> => {
 	const markets = await init2()
 	const property = provider.createEmptyWallet()
 	const signers = await getSigners()
@@ -436,14 +435,14 @@ describe('GitHubMarket', () => {
 	})
 	describe('khaosCallback', () => {
 		const getMarketsWithoutAdminAndKhaos = (
-			markets: markets
+			markets: Markets
 		): GitHubMarket[] => [
 			markets.operator,
 			markets.user,
 			markets.marketFactory,
 			markets.associatedMarket,
 		]
-		const getAdminAndKhaosMarkets = (markets: markets): GitHubMarket[] => [
+		const getAdminAndKhaosMarkets = (markets: Markets): GitHubMarket[] => [
 			markets.deployer,
 			markets.khaos,
 		]
