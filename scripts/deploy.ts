@@ -2,7 +2,6 @@
 /* eslint-disable spaced-comment */
 import { ethers } from 'hardhat'
 
-
 async function main() {
 	//!please check!!!!!!!!!
 	const registryAddress = ''
@@ -39,8 +38,7 @@ main()
 		process.exit(1)
 	})
 
-
-	// memo
-	// set registryAddress and adminAddress and update .env file
-	// and execute this command
-	// npx hardhat run --network arbitrumRinkeby scripts/deploy.ts
+// memo
+// set registryAddress and adminAddress and update .env file
+// and execute this command
+// npx hardhat run --network arbitrumRinkeby scripts/deploy.ts
