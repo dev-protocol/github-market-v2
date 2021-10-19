@@ -1,14 +1,10 @@
-
-/**
- * @type import('hardhat/config').HardhatUserConfig
- */
 import '@typechain/hardhat'
 import '@nomiclabs/hardhat-ethers'
 import '@nomiclabs/hardhat-waffle'
 import { HardhatUserConfig } from "hardhat/config";
+import * as dotenv from 'dotenv'
 
-const infuraKey = ''
-const mnemonic = ''
+dotenv.config()
 
 const config: HardhatUserConfig = {
 	solidity:{
@@ -22,9 +18,9 @@ const config: HardhatUserConfig = {
 	},
 	networks: {
 		arbitrumRinkeby: {
-		  url: 'https://arbitrum-rinkeby.infura.io/v3/' + infuraKey,
+		  url: `https://arbitrum-rinkeby.infura.io/v3/${process.env.INFURA_KEY}`,
 		  accounts: {
-			mnemonic
+			mnemonic: process.env.MNEMONIC,
 		  }
 		},
 	  },

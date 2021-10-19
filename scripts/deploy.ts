@@ -1,5 +1,5 @@
+/* eslint-disable capitalized-comments */
 /* eslint-disable spaced-comment */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 import { ethers } from 'hardhat'
 
 
@@ -41,6 +41,6 @@ main()
 
 
 	// memo
-	// set registryAddress and adminAddress and update hardhat.config infuraKey andmnemonic
+	// set registryAddress and adminAddress and update .env file
 	// and execute this command
 	// npx hardhat run --network arbitrumRinkeby scripts/deploy.ts
