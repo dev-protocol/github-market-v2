@@ -10,9 +10,8 @@ import { solidity } from 'ethereum-waffle'
 import GitHubMarketArtifact from '../artifacts/contracts/GitHubMarket.sol/GitHubMarket.json'
 import MarketAdminArtifact from '../artifacts/contracts/test/MarketAdmin.sol/MarketAdmin.json'
 import MarketProxyArtifact from '../artifacts/contracts/MarketProxy.sol/MarketProxy.json'
-import { GitHubMarket } from '../src/types/GitHubMarket'
-import { MarketAdmin } from '../src/types/MarketAdmin'
-import { MarketProxy } from '../src/types/MarketProxy'
+import { GitHubMarket, MarketAdmin, MarketProxy } from '../typechain'
+
 
 use(solidity)
 
