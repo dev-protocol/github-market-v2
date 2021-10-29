@@ -4,7 +4,6 @@ import { ethers } from 'hardhat'
 
 async function main() {
 	//!please check!!!!!!!!!
-	const registryAddress = ''
 	const adminAddress = ''
 	//!!!!!!!!!!!!!!!!!!!!!!
 
@@ -25,7 +24,7 @@ async function main() {
 	await marketProxy.deployed()
 
 	const proxy = gitHubMarketFactory.attach(marketProxy.address)
-	await proxy.initialize(registryAddress)
+	await proxy.initialize()
 
 	console.log('github market deployed to:', gitHubMarket.address)
 	console.log('market proxy deployed to:', marketProxy.address)

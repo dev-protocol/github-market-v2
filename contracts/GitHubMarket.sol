@@ -12,15 +12,14 @@ contract GitHubMarket is
 	PausableUpgradeable,
 	AccessControlUpgradeable
 {
-	address public registry;
 	address public override associatedMarket;
+	address public associatedMarketSetter;
 	mapping(address => string) private repositories;
 	mapping(bytes32 => address) private metrics;
 	mapping(bytes32 => address) private properties;
 	mapping(bytes32 => bool) private pendingAuthentication;
 
 	// ROLE
-	bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
 	bytes32 public constant KHAOS_ROLE = keccak256("KHAOS_ROLE");
 
 	// event
@@ -32,13 +31,10 @@ contract GitHubMarket is
 		address account
 	);
 
-	function initialize(address _registry) external initializer {
+	function initialize() external initializer {
 		__AccessControl_init();
 		__Pausable_init();
-		registry = _registry;
 		_setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
-		_setRoleAdmin(OPERATOR_ROLE, DEFAULT_ADMIN_ROLE);
-		_setupRole(OPERATOR_ROLE, _msgSender());
 		_setRoleAdmin(KHAOS_ROLE, DEFAULT_ADMIN_ROLE);
 		_setupRole(KHAOS_ROLE, _msgSender());
 	}
@@ -122,20 +118,6 @@ contract GitHubMarket is
 		return metrics[createKey(_repository)];
 	}
 
-	function addOperatorRole(address _operator)
-		external
-		onlyRole(DEFAULT_ADMIN_ROLE)
-	{
-		_setupRole(OPERATOR_ROLE, _operator);
-	}
-
-	function deleteOperatorRole(address _operator)
-		external
-		onlyRole(DEFAULT_ADMIN_ROLE)
-	{
-		revokeRole(OPERATOR_ROLE, _operator);
-	}
-
 	function addKhaosRole(address _khaos)
 		external
 		onlyRole(DEFAULT_ADMIN_ROLE)
@@ -151,11 +133,16 @@ contract GitHubMarket is
 	}
 
 	function setAssociatedMarket(address _associatedMarket) external override {
-		address marketFactory = IAddressRegistry(registry).registries(
-			"MarketFactory"
-		);
-		require(marketFactory == msg.sender, "illegal sender");
-		associatedMarket = _associatedMarket;
+		if(associatedMarket == address(0)) {
+			associatedMarket = _associatedMarket;
+			associatedMarketSetter = msg.sender;
+			return;
+		}
+		if (associatedMarketSetter == msg.sender) {
+			associatedMarket = _associatedMarket;
+			return;
+		}
+		revert("illegal access");
 	}
 
 	function name() external pure override returns (string memory) {
