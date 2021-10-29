@@ -3,7 +3,6 @@
 /* eslint-disable no-await-in-loop */
 
 import { expect, use } from 'chai'
-import { constants } from 'ethers'
 import { ethers, waffle } from 'hardhat'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers'
 import { solidity } from 'ethereum-waffle'
@@ -19,40 +18,32 @@ const { deployContract, deployMockContract, provider } = waffle
 
 type Signers = {
 	deployer: SignerWithAddress
-	operator: SignerWithAddress
 	khaos: SignerWithAddress
 	user: SignerWithAddress
-	marketFactory: SignerWithAddress
 	associatedMarket: SignerWithAddress
 }
 
 type Markets = {
 	deployer: GitHubMarket
-	operator: GitHubMarket
 	khaos: GitHubMarket
 	user: GitHubMarket
-	marketFactory: GitHubMarket
 	associatedMarket: GitHubMarket
 }
 
 const getSigners = async (): Promise<Signers> => {
-	const [deployer, operator, khaos, user, marketFactory, associatedMarket] =
+	const [deployer, khaos, user, associatedMarket] =
 		await ethers.getSigners()
 	return {
 		deployer,
-		operator,
 		khaos,
 		user,
-		marketFactory,
 		associatedMarket,
 	}
 }
 
 const getMarketsWithoutAdmin = (markets: Markets): GitHubMarket[] => [
-	markets.operator,
 	markets.khaos,
 	markets.user,
-	markets.marketFactory,
 	markets.associatedMarket,
 ]
 
@@ -78,40 +69,12 @@ const init = async (): Promise<Markets> => {
 		signers.deployer
 	)
 	const proxyMarket = gitHubMarketFactory.attach(proxy.address) as GitHubMarket
-	const reg = await deployMockContract(signers.deployer, [
-		{
-			inputs: [
-				{
-					internalType: 'string',
-					name: '_key',
-					type: 'string',
-				},
-			],
-			name: 'registries',
-			outputs: [
-				{
-					internalType: 'address',
-					name: '',
-					type: 'address',
-				},
-			],
-			stateMutability: 'view',
-			type: 'function',
-		},
-	])
-	await reg.mock.registries
-		.withArgs('MarketFactory')
-		.returns(signers.marketFactory.address)
-	// Await reg.setRegistry('MarketFactory', signers.marketFactory.address)
-	await proxyMarket.initialize(reg.address)
-	await proxyMarket.addOperatorRole(signers.operator.address)
+	await proxyMarket.initialize()
 	await proxyMarket.addKhaosRole(signers.khaos.address)
 	return {
 		deployer: proxyMarket,
-		operator: proxyMarket.connect(signers.operator),
 		khaos: proxyMarket.connect(signers.khaos),
 		user: proxyMarket.connect(signers.user),
-		marketFactory: proxyMarket.connect(signers.marketFactory),
 		associatedMarket: proxyMarket.connect(signers.associatedMarket),
 	}
 }
@@ -119,17 +82,17 @@ const init = async (): Promise<Markets> => {
 const init2 = async (): Promise<Markets> => {
 	const markets = await init()
 	const signers = await getSigners()
-	await markets.marketFactory.setAssociatedMarket(
+	await markets.deployer.setAssociatedMarket(
 		signers.associatedMarket.address
 	)
 	return markets
 }
 
 const init3 = async (): Promise<[Markets, string, string]> => {
-	const markets = await init2()
+	const markets = await init()
 	const property = provider.createEmptyWallet()
 	const signers = await getSigners()
-	await markets.marketFactory.setAssociatedMarket(
+	await markets.deployer.setAssociatedMarket(
 		signers.associatedMarket.address
 	)
 	await markets.associatedMarket.authenticate(
@@ -163,7 +126,7 @@ const init3 = async (): Promise<[Markets, string, string]> => {
 			type: 'function',
 		},
 	])
-	await markets.marketFactory.setAssociatedMarket(associatedMarket.address)
+	await markets.deployer.setAssociatedMarket(associatedMarket.address)
 	const metrics = provider.createEmptyWallet()
 	const key = ethers.utils.keccak256(
 		ethers.utils.toUtf8Bytes('user/repository')
@@ -176,17 +139,11 @@ const init3 = async (): Promise<[Markets, string, string]> => {
 
 describe('GitHubMarket', () => {
 	describe('initialize', () => {
-		describe('success', () => {
-			it('set initial value.', async () => {
-				const market = (await init()).deployer
-				expect(await market.registry()).to.not.equal(constants.AddressZero)
-			})
-		})
 		describe('fail', () => {
 			it('Cannot be executed multiple times.', async () => {
 				const market = (await init()).deployer
 				await expect(
-					market.initialize(constants.AddressZero)
+					market.initialize()
 				).to.be.revertedWith('Initializable: contract is already initialized')
 			})
 		})
@@ -289,58 +246,28 @@ describe('GitHubMarket', () => {
 			})
 		})
 	})
-	describe('addOperatorRole, deleteOperatorRole', () => {
-		describe('success', () => {
-			it('add operator role.', async () => {
-				const market = (await init()).deployer
-				const signers = await getSigners()
-				const role = await market.OPERATOR_ROLE()
-				expect(await market.hasRole(role, signers.user.address)).to.be.equal(
-					false
-				)
-				await market.addOperatorRole(signers.user.address)
-				expect(await market.hasRole(role, signers.user.address)).to.be.equal(
-					true
-				)
-			})
-			it('delete operator role.', async () => {
-				const market = (await init()).deployer
-				const signers = await getSigners()
-				const role = await market.OPERATOR_ROLE()
-				expect(
-					await market.hasRole(role, signers.operator.address)
-				).to.be.equal(true)
-				await market.deleteOperatorRole(signers.operator.address)
-				expect(
-					await market.hasRole(role, signers.operator.address)
-				).to.be.equal(false)
-			})
-		})
-		describe('fail', () => {
-			it('non Admin can not add operator role.', async () => {
-				const markets = getMarketsWithoutAdmin(await init())
-				const signers = await getSigners()
-				for (const market of markets) {
-					await expect(market.addOperatorRole(signers.user.address)).to.be
-						.reverted
-				}
-			})
-			it('non Admin can not delete operator role.', async () => {
-				const markets = getMarketsWithoutAdmin(await init())
-				const signers = await getSigners()
-				for (const market of markets) {
-					await expect(market.deleteOperatorRole(signers.operator.address)).to
-						.be.reverted
-				}
-			})
-		})
-	})
 	describe('setAssociatedMarket', () => {
 		describe('success', () => {
 			it('set associated market.', async () => {
 				const markets = await init()
 				const signers = await getSigners()
-				await markets.marketFactory.setAssociatedMarket(
+				await markets.deployer.setAssociatedMarket(
+					signers.associatedMarket.address
+				)
+				expect(await markets.deployer.associatedMarket()).to.be.equal(
+					signers.associatedMarket.address
+				)
+			})
+			it('set associated market again by some wallet.', async () => {
+				const markets = await init()
+				const signers = await getSigners()
+				await markets.deployer.setAssociatedMarket(
+					signers.associatedMarket.address
+				)
+				expect(await markets.deployer.associatedMarket()).to.be.equal(
+					signers.associatedMarket.address
+				)
+				await markets.deployer.setAssociatedMarket(
 					signers.associatedMarket.address
 				)
 				expect(await markets.deployer.associatedMarket()).to.be.equal(
@@ -349,19 +276,16 @@ describe('GitHubMarket', () => {
 			})
 		})
 		describe('fail', () => {
-			it('non Admin can not set associated market.', async () => {
+			it('can not reset associated market by other wallets.', async () => {
 				const markets = await init()
 				const signers = await getSigners()
-				for (const market of [
-					markets.deployer,
-					markets.operator,
-					markets.khaos,
-					markets.user,
-					markets.associatedMarket,
-				]) {
-					await expect(
-						market.setAssociatedMarket(signers.associatedMarket.address)
-					).to.be.revertedWith('illegal sender')
+				await markets.deployer.setAssociatedMarket(
+					signers.associatedMarket.address
+				)
+				const otherMarkets = getMarketsWithoutAdmin(markets)
+				for (const market of otherMarkets) {
+					await expect(market.setAssociatedMarket(signers.associatedMarket.address)).to.be
+						.revertedWith('illegal access')
 				}
 			})
 		})
@@ -416,10 +340,8 @@ describe('GitHubMarket', () => {
 				const signers = await getSigners()
 				for (const market of [
 					markets.deployer,
-					markets.operator,
 					markets.khaos,
 					markets.user,
-					markets.marketFactory,
 				]) {
 					await expect(
 						market.authenticate(
@@ -436,9 +358,7 @@ describe('GitHubMarket', () => {
 		const getMarketsWithoutAdminAndKhaos = (
 			markets: Markets
 		): GitHubMarket[] => [
-			markets.operator,
 			markets.user,
-			markets.marketFactory,
 			markets.associatedMarket,
 		]
 		const getAdminAndKhaosMarkets = (markets: Markets): GitHubMarket[] => [
@@ -503,7 +423,7 @@ describe('GitHubMarket', () => {
 			it('not authenticate.', async () => {
 				const markets = await init2()
 				const signers = await getSigners()
-				await markets.marketFactory.setAssociatedMarket(
+				await markets.deployer.setAssociatedMarket(
 					signers.associatedMarket.address
 				)
 				const market = markets.deployer
