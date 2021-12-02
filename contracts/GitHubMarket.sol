@@ -133,7 +133,7 @@ contract GitHubMarket is
 	}
 
 	function setAssociatedMarket(address _associatedMarket) external override {
-		if(associatedMarket == address(0)) {
+		if (associatedMarket == address(0)) {
 			associatedMarket = _associatedMarket;
 			associatedMarketSetter = msg.sender;
 			return;

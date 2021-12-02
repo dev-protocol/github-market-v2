@@ -11,7 +11,6 @@ import MarketAdminArtifact from '../artifacts/contracts/test/MarketAdmin.sol/Mar
 import MarketProxyArtifact from '../artifacts/contracts/MarketProxy.sol/MarketProxy.json'
 import { GitHubMarket, MarketAdmin, MarketProxy } from '../typechain'
 
-
 use(solidity)
 
 const { deployContract, deployMockContract, provider } = waffle
@@ -31,8 +30,7 @@ type Markets = {
 }
 
 const getSigners = async (): Promise<Signers> => {
-	const [deployer, khaos, user, associatedMarket] =
-		await ethers.getSigners()
+	const [deployer, khaos, user, associatedMarket] = await ethers.getSigners()
 	return {
 		deployer,
 		khaos,
@@ -82,9 +80,7 @@ const init = async (): Promise<Markets> => {
 const init2 = async (): Promise<Markets> => {
 	const markets = await init()
 	const signers = await getSigners()
-	await markets.deployer.setAssociatedMarket(
-		signers.associatedMarket.address
-	)
+	await markets.deployer.setAssociatedMarket(signers.associatedMarket.address)
 	return markets
 }
 
@@ -92,9 +88,7 @@ const init3 = async (): Promise<[Markets, string, string]> => {
 	const markets = await init()
 	const property = provider.createEmptyWallet()
 	const signers = await getSigners()
-	await markets.deployer.setAssociatedMarket(
-		signers.associatedMarket.address
-	)
+	await markets.deployer.setAssociatedMarket(signers.associatedMarket.address)
 	await markets.associatedMarket.authenticate(
 		property.address,
 		['user/repository', 'dummy-signature'],
@@ -142,9 +136,9 @@ describe('GitHubMarket', () => {
 		describe('fail', () => {
 			it('Cannot be executed multiple times.', async () => {
 				const market = (await init()).deployer
-				await expect(
-					market.initialize()
-				).to.be.revertedWith('Initializable: contract is already initialized')
+				await expect(market.initialize()).to.be.revertedWith(
+					'Initializable: contract is already initialized'
+				)
 			})
 		})
 	})
@@ -284,8 +278,9 @@ describe('GitHubMarket', () => {
 				)
 				const otherMarkets = getMarketsWithoutAdmin(markets)
 				for (const market of otherMarkets) {
-					await expect(market.setAssociatedMarket(signers.associatedMarket.address)).to.be
-						.revertedWith('illegal access')
+					await expect(
+						market.setAssociatedMarket(signers.associatedMarket.address)
+					).to.be.revertedWith('illegal access')
 				}
 			})
 		})
@@ -338,11 +333,7 @@ describe('GitHubMarket', () => {
 				const markets = await init2()
 				const property = provider.createEmptyWallet()
 				const signers = await getSigners()
-				for (const market of [
-					markets.deployer,
-					markets.khaos,
-					markets.user,
-				]) {
+				for (const market of [markets.deployer, markets.khaos, markets.user]) {
 					await expect(
 						market.authenticate(
 							property.address,
@@ -357,10 +348,7 @@ describe('GitHubMarket', () => {
 	describe('khaosCallback', () => {
 		const getMarketsWithoutAdminAndKhaos = (
 			markets: Markets
-		): GitHubMarket[] => [
-			markets.user,
-			markets.associatedMarket,
-		]
+		): GitHubMarket[] => [markets.user, markets.associatedMarket]
 		const getAdminAndKhaosMarkets = (markets: Markets): GitHubMarket[] => [
 			markets.deployer,
 			markets.khaos,
