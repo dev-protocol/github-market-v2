@@ -1,11 +1,12 @@
 /* eslint-disable capitalized-comments */
-/* eslint-disable spaced-comment */
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
 import { ethers } from 'hardhat'
 
 async function main() {
-	//!please check!!!!!!!!!
-	const adminAddress = ''
-	//!!!!!!!!!!!!!!!!!!!!!!
+
+	const adminAddress = process.env.ADMIN!
+	console.log('admin:', adminAddress)
 
 	// GitHubMarket
 	const gitHubMarketFactory = await ethers.getContractFactory('GitHubMarket')
@@ -38,6 +39,6 @@ main()
 	})
 
 // memo
-// set registryAddress and adminAddress and update .env file
+// add admin address to .env file
 // and execute this command
 // npx hardhat run --network arbitrumRinkeby scripts/deploy.ts

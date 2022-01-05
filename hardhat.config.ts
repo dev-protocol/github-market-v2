@@ -27,6 +27,12 @@ const config: HardhatUserConfig = {
 				mnemonic: mnemnoc,
 			},
 		},
+		polygonMunbai: {
+			url: `https://polygon-mumbai.infura.io/v3/${process.env.INFURA_KEY!}`,
+			accounts: {
+				mnemonic: mnemnoc,
+			},
+		},
 	},
 }
 
