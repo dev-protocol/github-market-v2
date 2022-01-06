@@ -1,14 +1,15 @@
 /* eslint-disable new-cap */
 /* eslint-disable @typescript-eslint/await-thenable */
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/restrict-template-expressions */
+
 import { ethers } from 'hardhat'
 
 async function main() {
+	const [deployer] = await ethers.getSigners()
+	console.log('the account:', deployer.address)
+	console.log('Account balance:', (await deployer.getBalance()).toString())
 
-	const marketBehaviorProxyAddress = process.env.MARKET_BEHAVIOR_PROXY!
+	const marketBehaviorProxyAddress = process.env.GITHUB_MARKET_PROXY!
 	const addRole = process.env.ADD_ROLE!
 
 	console.log(`market behavior address:${marketBehaviorProxyAddress}`)
