@@ -8,29 +8,14 @@ async function main() {
 	console.log('the account:', deployer.address)
 	console.log('Account balance:', (await deployer.getBalance()).toString())
 
-	const adminAddress = process.env.ADMIN!
-	console.log('admin:', adminAddress)
+	const githubMarketProxy = process.env.GITHUB_MARKET_PROXY!
+	console.log('github market:', githubMarketProxy)
 
 	// GitHubMarket
 	const gitHubMarketFactory = await ethers.getContractFactory('GitHubMarket')
-	const gitHubMarket = await gitHubMarketFactory.deploy()
-	await gitHubMarket.deployed()
-	const data = ethers.utils.arrayify('0x')
 
-	// MarketProxy
-	const marketProxyFactory = await ethers.getContractFactory('MarketProxy')
-	const marketProxy = await marketProxyFactory.deploy(
-		gitHubMarket.address,
-		adminAddress,
-		data
-	)
-	await marketProxy.deployed()
-
-	const proxy = gitHubMarketFactory.attach(marketProxy.address)
+	const proxy = gitHubMarketFactory.attach(githubMarketProxy)
 	await proxy.initialize()
-
-	console.log('github market deployed to:', gitHubMarket.address)
-	console.log('market proxy deployed to:', marketProxy.address)
 }
 
 main()
